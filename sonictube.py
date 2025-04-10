@@ -1,4 +1,7 @@
+from flask import Flask, request, jsonify
 import yt_dlp
+
+app = Flask(__name__)
 
 def download_video(url):
     ydl_opts = {
@@ -10,7 +13,18 @@ def download_video(url):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
 
+@app.route("/download", methods=["GET"])
+def handle_download():
+    video_url = request.args.get("url")
+    if not video_url:
+        return jsonify({"error": "No URL provided"}), 400
+
+    try:
+        download_video(video_url)
+        return jsonify({"message": "Video downloaded successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
-    video_url = input("Enter video URL: ")
-    download_video(video_url)
+    app.run(debug=True, host="0.0.0.0", port=10000)
 
