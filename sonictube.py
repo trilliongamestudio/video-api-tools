@@ -1,65 +1,77 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 import yt_dlp
+import os
+import uuid
 
 app = Flask(__name__)
 
-def download_video(url):
-    ydl_opts = {
-        'outtmpl': '%(title)s.%(ext)s',
+DOWNLOADS_DIR = "downloads"
+os.makedirs(DOWNLOADS_DIR, exist_ok=True)
+
+def get_ydl_opts(video_format, output_path):
+    format_map = {
+        "360p": 'bestvideo[height<=360]+bestaudio/best[height<=360]',
+        "720p": 'bestvideo[height<=720]+bestaudio/best[height<=720]',
+        "1080p": 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
+        "4k": 'bestvideo[height<=2160]+bestaudio/best[height<=2160]',
+        "mp3": 'bestaudio/best'
     }
 
-    if download_format == "mp3":
-        ydl_opts.update({
-            'format': 'bestaudio',
+    opts = {
+        'outtmpl': output_path,
+        'merge_output_format': 'mp4',
+        'quiet': True
+    }
+
+    if video_format == "mp3":
+        opts.update({
+            'format': format_map.get(video_format),
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
                 'preferredquality': '192',
             }],
         })
-    elif download_format == "360p":
-        ydl_opts.update({
-            'format': 'bestvideo[height<=360]+bestaudio/best[height<=360]',
-            'merge_output_format': 'mp4',
-        })
-    elif download_format == "720p":
-        ydl_opts.update({
-            'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]',
-            'merge_output_format': 'mp4',
-        })
-    elif download_format == "1440p":
-        ydl_opts.update({
-            'format': 'bestvideo[height<=1440]+bestaudio/best[height<=1440]',
-            'merge_output_format': 'mp4',
-        })
-    elif download_format == "4k":
-        ydl_opts.update({
-            'format': 'bestvideo[height<=2160]+bestaudio/best[height<=2160]',
-            'merge_output_format': 'mp4',
-        })
     else:
-        ydl_opts.update({
-            'format': 'bestvideo+bestaudio/best',
-            'merge_output_format': 'mp4',
-        })
+        opts.update({'format': format_map.get(video_format, 'best')})
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([video_url])
-        return jsonify({"message": f"{download_format} downloaded successfully"}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return opts
+
+@app.route("/")
+def home():
+    return "✅ SonicTube backend is running!"
 
 @app.route("/download", methods=["GET"])
-def handle_download():
+def download_handler():
     video_url = request.args.get("url")
+    video_format = request.args.get("format", "mp4")
+
     if not video_url:
         return jsonify({"error": "No URL provided"}), 400
 
+    unique_filename = f"{uuid.uuid4()}.%(ext)s"
+    output_template = os.path.join(DOWNLOADS_DIR, unique_filename)
+
+    ydl_opts = get_ydl_opts(video_format, output_template)
+
     try:
-        download_video(video_url)
-        return jsonify({"message": "Video downloaded successfully"}), 200
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(video_url, download=True)
+            final_ext = "mp3" if video_format == "mp3" else info.get('ext', 'mp4')
+            downloaded_file = os.path.join(DOWNLOADS_DIR, f"{unique_filename.split('.')[0]}.{final_ext}")
+
+        return send_file(downloaded_file, as_attachment=True)
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    print("Starting SonicTube backend...")
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
+
+
+
+
 
 
