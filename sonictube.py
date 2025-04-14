@@ -20,7 +20,8 @@ def get_ydl_opts(video_format, output_path):
     opts = {
         'outtmpl': output_path,
         'merge_output_format': 'mp4',
-        'quiet': True
+        'quiet': True,
+        'cookiefile': 'cookies.txt'  # 👈 use cookies for auth/age-restricted/private videos
     }
 
     if video_format == "mp3":
@@ -57,18 +58,25 @@ def download_handler():
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=True)
-            final_ext = "mp3" if video_format == "mp3" else info.get('ext', 'mp4')
-            downloaded_file = os.path.join(DOWNLOADS_DIR, f"{unique_filename.split('.')[0]}.{final_ext}")
+            downloaded_file = info.get('_filename')
+            if video_format == "mp3":
+                downloaded_file = downloaded_file.rsplit('.', 1)[0] + '.mp3'
+
+        print("Downloaded file path:", downloaded_file)
+        print("Exists:", os.path.exists(downloaded_file))
+        print("Size:", os.path.getsize(downloaded_file), "bytes")
 
         return send_file(downloaded_file, as_attachment=True)
 
     except Exception as e:
+        print("❌ Error during download:", str(e))
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    print("Starting SonicTube backend...")
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(debug=True)
+
+
+
 
 
 
