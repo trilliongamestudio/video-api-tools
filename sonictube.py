@@ -5,9 +5,11 @@ import uuid
 
 app = Flask(__name__)
 
+# 🔽 Create downloads folder if not exists
 DOWNLOADS_DIR = "downloads"
 os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 
+# 🔽 Format options
 def get_ydl_opts(video_format, output_path):
     format_map = {
         "360p": 'bestvideo[height<=360]+bestaudio/best[height<=360]',
@@ -17,16 +19,21 @@ def get_ydl_opts(video_format, output_path):
         "mp3": 'bestaudio/best'
     }
 
+    # ✅ yt-dlp options with headers to bypass restrictions
     opts = {
         'outtmpl': output_path,
         'merge_output_format': 'mp4',
         'quiet': True,
-        'cookiefile': 'cookies.txt'  # 👈 use cookies for auth/age-restricted/private videos
+        'cookiefile': 'cookies.txt',
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            'Accept-Language': 'en-US,en;q=0.9'
+        }
     }
 
     if video_format == "mp3":
         opts.update({
-            'format': format_map.get(video_format),
+            'format': format_map.get("mp3"),
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
@@ -50,6 +57,7 @@ def download_handler():
     if not video_url:
         return jsonify({"error": "No URL provided"}), 400
 
+    # 🧠 Unique filename for output
     unique_filename = f"{uuid.uuid4()}.%(ext)s"
     output_template = os.path.join(DOWNLOADS_DIR, unique_filename)
 
@@ -59,12 +67,16 @@ def download_handler():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_url, download=True)
             downloaded_file = info.get('_filename')
-            if video_format == "mp3":
+
+            if video_format == "mp3" and downloaded_file:
                 downloaded_file = downloaded_file.rsplit('.', 1)[0] + '.mp3'
 
-        print("Downloaded file path:", downloaded_file)
-        print("Exists:", os.path.exists(downloaded_file))
-        print("Size:", os.path.getsize(downloaded_file), "bytes")
+        # 🧠 Check if file really exists
+        if not downloaded_file or not os.path.exists(downloaded_file):
+            raise Exception("Download failed: File not found.")
+
+        print("✅ File downloaded:", downloaded_file)
+        print("📏 Size:", os.path.getsize(downloaded_file), "bytes")
 
         return send_file(downloaded_file, as_attachment=True)
 
@@ -74,6 +86,7 @@ def download_handler():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
