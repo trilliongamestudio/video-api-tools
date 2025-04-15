@@ -4,6 +4,7 @@ import os
 import uuid
 import random
 import time
+import re
 
 app = Flask(__name__)
 
@@ -17,6 +18,9 @@ USER_AGENTS = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 12_2_1) AppleWebKit/537.36 Chrome/99.0.4844.84 Safari/537.36",
     "Mozilla/5.0 (Linux; Android 10; SM-A505F) AppleWebKit/537.36 Chrome/93.0.4577.62 Mobile Safari/537.36"
 ]
+
+def sanitize_filename(title):
+    return re.sub(r'[^\w\-_. ]', '_', title).strip().replace(' ', '_')
 
 def detect_platform(url):
     if "youtube.com" in url or "youtu.be" in url:
@@ -46,10 +50,8 @@ def get_ydl_opts(video_format, output_path, platform):
         'http_headers': headers
     }
 
-    # ✅ Only add cookiefile if it exists
     if os.path.exists("cookies.txt"):
         opts['cookiefile'] = 'cookies.txt'
-
 
     if platform == "youtube":
         format_map = {
@@ -120,10 +122,17 @@ def download_handler():
     platform = detect_platform(video_url)
     print(f"🔍 Platform: {platform}")
 
-    unique_filename = f"{uuid.uuid4()}.%(ext)s"
-    output_template = os.path.join(DOWNLOADS_DIR, unique_filename)
+    # Temporary info grab to fetch title first
+    try:
+        with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+            info_dict = ydl.extract_info(video_url, download=False)
+            video_title = sanitize_filename(info_dict.get('title') or str(uuid.uuid4()))
+    except Exception as e:
+        print("[Warning] Couldn't fetch title:", e)
+        video_title = str(uuid.uuid4())
 
-    ydl_opts = get_ydl_opts(video_format, output_template, platform)
+    final_filename_template = os.path.join(DOWNLOADS_DIR, f"{video_title}.%(ext)s")
+    ydl_opts = get_ydl_opts(video_format, final_filename_template, platform)
 
     if ydl_opts is None:
         return jsonify({"error": f"Invalid format: {video_format}"}), 400
@@ -160,6 +169,8 @@ def download_handler():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
+
 
 
 
