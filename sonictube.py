@@ -56,6 +56,7 @@ def get_ydl_opts(video_format, output_path, platform):
     if platform == "youtube":
         fallback_chain = {
             "4k": ["2160", "1440", "1080", "720", "360"],
+            "2k": ["1440", "1080", "720", "360"],
             "1440p": ["1440", "1080", "720", "360"],
             "1080p": ["1080", "720", "360"],
             "720p": ["720", "360"],
@@ -77,23 +78,15 @@ def get_ydl_opts(video_format, output_path, platform):
                 [f"bestvideo[height<={res}]+bestaudio/best[height<={res}]" for res in resolutions]
             )
             opts.update({
-                'format': fallback_query,
-                'postprocessors': [{
-                    'key': 'FFmpegMerger',
-                    'preferredformat': 'mp4',
-                }]
+                'format': fallback_query
+                # No FFmpeg for video! Let yt-dlp handle the merge automatically.
             })
         else:
             return None
     else:
-        # For non-YouTube platforms, just download best available video + audio
+        # Instagram / TikTok / Snapchat / Pinterest = Best MP4
         opts.update({
             'format': 'bestvideo+bestaudio/best',
-            'merge_output_format': 'mp4',
-            'postprocessors': [{
-                'key': 'FFmpegMerger',
-                'preferredformat': 'mp4',
-            }]
         })
 
     return opts
@@ -155,10 +148,14 @@ def download_handler():
     if not info:
         return jsonify({"error": "Failed to download video"}), 500
 
-    downloaded_file = info.get('_filename')
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        downloaded_file = ydl.prepare_filename(info)
 
-    if video_format == "mp3" and downloaded_file:
+    if video_format == "mp3":
         downloaded_file = downloaded_file.rsplit('.', 1)[0] + '.mp3'
+
+    print("✅ Final output file:", downloaded_file)
+    print("📄 Exists?", os.path.exists(downloaded_file))
 
     if not downloaded_file or not os.path.exists(downloaded_file):
         return jsonify({"error": "Download failed: file not found"}), 500
@@ -182,6 +179,9 @@ def download_handler():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
+
+
 
 
 
