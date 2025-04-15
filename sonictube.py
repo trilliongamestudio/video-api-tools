@@ -54,35 +54,39 @@ def get_ydl_opts(video_format, output_path, platform):
         opts['cookiefile'] = 'cookies.txt'
 
     if platform == "youtube":
-        format_map = {
-            "360p": 'bestvideo[height<=360]+bestaudio/best[height<=360]',
-            "720p": 'bestvideo[height<=720]+bestaudio/best[height<=720]',
-            "1080p": 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
-            "4k": 'bestvideo[height<=2160]+bestaudio/best[height<=2160]',
-            "mp3": 'bestaudio/best'
+        fallback_chain = {
+            "4k": ["2160", "1440", "1080", "720", "360"],
+            "1440p": ["1440", "1080", "720", "360"],
+            "1080p": ["1080", "720", "360"],
+            "720p": ["720", "360"],
+            "360p": ["360"]
         }
-
-        if video_format not in format_map:
-            return None
 
         if video_format == "mp3":
             opts.update({
-                'format': format_map["mp3"],
+                'format': 'bestaudio/best',
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
                     'preferredquality': '192',
                 }],
             })
-        else:
+        elif video_format in fallback_chain:
+            resolutions = fallback_chain[video_format]
+            fallback_query = "/".join(
+                [f"bestvideo[height<={res}]+bestaudio/best[height<={res}]" for res in resolutions]
+            )
             opts.update({
-                'format': format_map[video_format],
+                'format': fallback_query,
                 'postprocessors': [{
                     'key': 'FFmpegMerger',
                     'preferredformat': 'mp4',
                 }]
             })
+        else:
+            return None
     else:
+        # For non-YouTube platforms, just download best available video + audio
         opts.update({
             'format': 'bestvideo+bestaudio/best',
             'merge_output_format': 'mp4',
@@ -132,7 +136,6 @@ def download_handler():
     platform = detect_platform(video_url)
     print(f"🔍 Platform: {platform}")
 
-    # Temporary info grab to fetch title first
     try:
         with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
             info_dict = ydl.extract_info(video_url, download=False)
@@ -179,6 +182,7 @@ def download_handler():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
