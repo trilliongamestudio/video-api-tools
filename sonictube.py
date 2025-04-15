@@ -45,7 +45,7 @@ def get_ydl_opts(video_format, output_path, platform):
 
     opts = {
         'outtmpl': output_path,
-        'merge_output_format': 'mp4',
+        'merge_output_format': 'mp4',  # ✅ This triggers FFmpeg auto merge
         'quiet': True,
         'http_headers': headers,
     }
@@ -80,10 +80,7 @@ def get_ydl_opts(video_format, output_path, platform):
                 )
                 opts.update({
                     'format': fallback_query,
-                    'postprocessors': [{
-                        'key': 'FFmpegMerger',
-                        'preferredformat': 'mp4',
-                    }],
+                    # ✅ No postprocessors needed here
                 })
             else:
                 return None
@@ -91,13 +88,11 @@ def get_ydl_opts(video_format, output_path, platform):
             # Non-YouTube: best available with merge
             opts.update({
                 'format': 'bestvideo+bestaudio/best',
-                'postprocessors': [{
-                    'key': 'FFmpegMerger',
-                    'preferredformat': 'mp4',
-                }],
+                # ✅ No postprocessors needed here either
             })
 
     return opts
+
 
 @app.route("/")
 def home():
