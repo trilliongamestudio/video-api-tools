@@ -75,11 +75,21 @@ def get_ydl_opts(video_format, output_path, platform):
                 }],
             })
         else:
-            opts.update({'format': format_map[video_format]})
+            opts.update({
+                'format': format_map[video_format],
+                'postprocessors': [{
+                    'key': 'FFmpegMerger',
+                    'preferredformat': 'mp4',
+                }]
+            })
     else:
         opts.update({
             'format': 'bestvideo+bestaudio/best',
-            'merge_output_format': 'mp4'
+            'merge_output_format': 'mp4',
+            'postprocessors': [{
+                'key': 'FFmpegMerger',
+                'preferredformat': 'mp4',
+            }]
         })
 
     return opts
@@ -169,6 +179,7 @@ def download_handler():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
