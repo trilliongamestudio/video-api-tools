@@ -153,17 +153,26 @@ def download_handler():
     info = download_with_retry(video_url, ydl_opts)
 
     if not info:
+        print("❌ yt-dlp failed to download the video.")
         return jsonify({"error": "Failed to download video"}), 500
 
-    downloaded_file = info.get('_filename')
+    # Prepare actual file path
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        downloaded_file = ydl.prepare_filename(info)
 
     if video_format == "mp3" and downloaded_file:
         downloaded_file = downloaded_file.rsplit('.', 1)[0] + '.mp3'
 
+    # Debug logging
+    print("✅ yt-dlp returned filename:", downloaded_file)
+    print("📂 File exists?", os.path.exists(downloaded_file))
+    print("📏 Requested format:", video_format)
+
     if not downloaded_file or not os.path.exists(downloaded_file):
+        print("❌ File not found at expected path.")
         return jsonify({"error": "Download failed: file not found"}), 500
 
-    print("📁 File downloaded:", downloaded_file)
+    print("📁 File ready to send:", downloaded_file)
 
     @after_this_request
     def cleanup(response):
@@ -182,6 +191,7 @@ def download_handler():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
