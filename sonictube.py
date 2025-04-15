@@ -147,7 +147,6 @@ def download_handler():
         return jsonify({"error": f"Invalid format: {video_format}"}), 400
 
     info = download_with_retry(video_url, ydl_opts)
-
     if not info:
         return jsonify({"error": "Failed to download video"}), 500
 
@@ -162,6 +161,15 @@ def download_handler():
 
     if not downloaded_file or not os.path.exists(downloaded_file):
         return jsonify({"error": "Download failed: file not found"}), 500
+
+    # 🔁 Wait until file is actually released (Windows fix)
+    for _ in range(10):
+        try:
+            with open(downloaded_file, 'rb'):
+                break
+        except PermissionError:
+            print("⏳ File is still locked. Retrying...")
+            time.sleep(0.3)
 
     print("📁 File downloaded:", downloaded_file)
 
@@ -179,6 +187,7 @@ def download_handler():
         as_attachment=True,
         mimetype='audio/mpeg' if video_format == "mp3" else 'video/mp4'
     )
+
 
 if __name__ == "__main__":
     app.run(debug=True)
