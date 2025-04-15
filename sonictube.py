@@ -47,47 +47,55 @@ def get_ydl_opts(video_format, output_path, platform):
         'outtmpl': output_path,
         'merge_output_format': 'mp4',
         'quiet': True,
-        'http_headers': headers
+        'http_headers': headers,
     }
 
     if os.path.exists("cookies.txt"):
         opts['cookiefile'] = 'cookies.txt'
 
-    if platform == "youtube":
-        fallback_chain = {
-            "4k": ["2160", "1440", "1080", "720", "360"],
-            "2k": ["1440", "1080", "720", "360"],
-            "1440p": ["1440", "1080", "720", "360"],
-            "1080p": ["1080", "720", "360"],
-            "720p": ["720", "360"],
-            "360p": ["360"]
-        }
+    if video_format == "mp3":
+        opts.update({
+            'format': 'bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+        })
+    else:
+        if platform == "youtube":
+            fallback_chain = {
+                "4k": ["2160", "1440", "1080", "720", "360"],
+                "2k": ["1440", "1080", "720", "360"],
+                "1440p": ["1440", "1080", "720", "360"],
+                "1080p": ["1080", "720", "360"],
+                "720p": ["720", "360"],
+                "360p": ["360"]
+            }
 
-        if video_format == "mp3":
+            if video_format in fallback_chain:
+                resolutions = fallback_chain[video_format]
+                fallback_query = "/".join(
+                    [f"bestvideo[height<={res}]+bestaudio/best[height<={res}]" for res in resolutions]
+                )
+                opts.update({
+                    'format': fallback_query,
+                    'postprocessors': [{
+                        'key': 'FFmpegMerger',
+                        'preferredformat': 'mp4',
+                    }],
+                })
+            else:
+                return None
+        else:
+            # Non-YouTube: best available with merge
             opts.update({
-                'format': 'bestaudio/best',
+                'format': 'bestvideo+bestaudio/best',
                 'postprocessors': [{
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'mp3',
-                    'preferredquality': '192',
+                    'key': 'FFmpegMerger',
+                    'preferredformat': 'mp4',
                 }],
             })
-        elif video_format in fallback_chain:
-            resolutions = fallback_chain[video_format]
-            fallback_query = "/".join(
-                [f"bestvideo[height<={res}]+bestaudio/best[height<={res}]" for res in resolutions]
-            )
-            opts.update({
-                'format': fallback_query
-                # No FFmpeg for video! Let yt-dlp handle the merge automatically.
-            })
-        else:
-            return None
-    else:
-        # Instagram / TikTok / Snapchat / Pinterest = Best MP4
-        opts.update({
-            'format': 'bestvideo+bestaudio/best',
-        })
 
     return opts
 
@@ -179,6 +187,7 @@ def download_handler():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
