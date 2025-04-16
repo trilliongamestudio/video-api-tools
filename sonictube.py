@@ -8,7 +8,8 @@ import re
 
 app = Flask(__name__)
 
-DOWNLOADS_DIR = "downloads"
+# Use an absolute path for downloads on Render
+DOWNLOADS_DIR = os.path.join(os.path.dirname(__file__), "downloads")
 os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 
 USER_AGENTS = [
@@ -45,7 +46,7 @@ def get_ydl_opts(video_format, output_path, platform):
 
     opts = {
         'outtmpl': output_path,
-        'merge_output_format': 'mp4',  # ✅ This triggers FFmpeg auto merge
+        'merge_output_format': 'mp4',
         'quiet': True,
         'http_headers': headers,
     }
@@ -80,19 +81,15 @@ def get_ydl_opts(video_format, output_path, platform):
                 )
                 opts.update({
                     'format': fallback_query,
-                    # ✅ No postprocessors needed here
                 })
             else:
                 return None
         else:
-            # Non-YouTube: best available with merge
             opts.update({
                 'format': 'bestvideo+bestaudio/best',
-                # ✅ No postprocessors needed here either
             })
 
     return opts
-
 
 @app.route("/")
 def home():
@@ -162,7 +159,7 @@ def download_handler():
     if not downloaded_file or not os.path.exists(downloaded_file):
         return jsonify({"error": "Download failed: file not found"}), 500
 
-    # 🔁 Wait until file is actually released (Windows fix)
+    # Wait until file is released (Windows fix)
     for _ in range(10):
         try:
             with open(downloaded_file, 'rb'):
@@ -188,9 +185,9 @@ def download_handler():
         mimetype='audio/mpeg' if video_format == "mp3" else 'video/mp4'
     )
 
-
-if __name__ == "__main__":
-    app.run(debug=True)
+# Remove app.run() for Render deployment
+# if __name__ == "__main__":
+#     app.run(debug=True, host='0.0.0.0', port=8080)
 
 
 
